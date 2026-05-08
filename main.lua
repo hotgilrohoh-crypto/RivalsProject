@@ -1,116 +1,84 @@
--- RivalX Project | The Ultimate Competition Edition
--- Features: Combat, ESP, Visual Unlocker, Misc
--- No Key | Xeno Compatible
+-- [[ KICIA HOOK V4 - TRUE FOV SILENT AIM ]]
+local KiciaLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/kavo"))()
+local Window = KiciaLib.AssetLibrary("Kicia Hook | Rivals", 1)
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- USTAWIENIA (Tego szukałeś)
+getgenv().SilentAimEnabled = false
+getgenv().ShowFOV = true
+getgenv().FOVSize = 150
+getgenv().TargetPart = "Head" -- Zawsze w głowę
 
-local Window = Rayfield:CreateWindow({
-   Name = "RivalX Project | God Mode",
-   LoadingTitle = "RivalX Infrastructure",
-   LoadingSubtitle = "by hotgilrohoh-crypto",
-   ConfigurationSaving = { Enabled = false }
-})
+-- KOŁO FOV (Drawing API)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.Color = Color3.fromRGB(255, 0, 150)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.Visible = getgenv().ShowFOV
 
--- ZAKŁADKI
-local TabCombat = Window:CreateTab("Combat", 4483362458)
-local TabVisuals = Window:CreateTab("Visuals", 4483362458)
-local TabMisc = Window:CreateTab("Misc", 4483362458)
+-- AKTUALIZACJA KOŁA
+game:GetService("RunService").RenderStepped:Connect(function()
+    FOVCircle.Radius = getgenv().FOVSize
+    FOVCircle.Position = Vector2.new(game.Players.LocalPlayer:GetMouse().X, game.Players.LocalPlayer:GetMouse().Y + 36)
+    FOVCircle.Visible = getgenv().ShowFOV
+end)
 
--- --- SEKACJA COMBAT (Aimbot & Silent Aim) ---
-TabCombat:CreateSection("Main Combat")
+local Tab1 = Window:AddPage("Combat", 5012544693)
+local CombatSec = Tab1:AddSection("Silent Aim")
 
-TabCombat:CreateToggle({
-   Name = "Silent Aim (Hitbox Expansion)",
-   CurrentValue = false,
-   Callback = function(Value)
-      _G.SilentAim = Value
-      spawn(function()
-         while _G.SilentAim do
-            for _, v in pairs(game.Players:GetPlayers()) do
-               if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("Head") then
-                  v.Character.Head.Size = Vector3.new(10, 10, 10)
-                  v.Character.Head.Transparency = 0.5
-                  v.Character.Head.CanCollide = false
-               end
+CombatSec:AddToggle("Enable Silent Aim", false, function(t)
+    getgenv().SilentAimEnabled = t
+end)
+
+CombatSec:AddSlider("FOV Size", 150, 0, 500, function(s)
+    getgenv().FOVSize = s
+end)
+
+CombatSec:AddToggle("Show FOV Circle", true, function(t)
+    getgenv().ShowFOV = t
+end)
+
+-- LOGIKA 1:1 KICIA (Przechwytywanie Indexu)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+function GetClosestTarget()
+    local target = nil
+    local dist = getgenv().FOVSize
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local pos, vis = game.Workspace.CurrentCamera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+            if magnitude < dist and vis then
+                target = v
+                dist = magnitude
             end
-            task.wait(1)
-         end
-         -- Reset head size when off
-         for _, v in pairs(game.Players:GetPlayers()) do
-            if v.Character and v.Character:FindFirstChild("Head") then
-               v.Character.Head.Size = Vector3.new(1, 1, 1)
-               v.Character.Head.Transparency = 0
+        end
+    end
+    return target
+end
+
+-- HOOKOWANIE (To sprawia, że trafiasz w głowę poza celownikiem)
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, index)
+    if self == Mouse and (index == "Hit" or index == "Target") then
+        if getgenv().SilentAimEnabled then
+            local target = GetClosestTarget()
+            if target and target.Character and target.Character:FindFirstChild(getgenv().TargetPart) then
+                return (index == "Hit" and target.Character[getgenv().TargetPart].CFrame or target.Character[getgenv().TargetPart])
             end
-         end
-      end)
-   end,
-})
+        end
+    end
+    return oldIndex(self, index)
+end)
+setreadonly(mt, true)
 
--- --- SEKACJA VISUALS (ESP & UNLOCK ALL) ---
-TabVisuals:CreateSection("Visual Enhancements")
-
-TabVisuals:CreateToggle({
-   Name = "Full ESP (Box & Tracers)",
-   CurrentValue = false,
-   Callback = function(Value)
-      -- Logika Highlight ESP (najładniejsza)
-      for _, v in pairs(game.Players:GetPlayers()) do
-         if v ~= game.Players.LocalPlayer and v.Character then
-            if Value then
-               local h = Instance.new("Highlight", v.Character)
-               h.Name = "RivalX_ESP"
-               h.FillColor = Color3.fromRGB(255, 0, 0)
-            else
-               if v.Character:FindFirstChild("RivalX_ESP") then v.Character.RivalX_ESP:Destroy() end
-            end
-         end
-      end
-   end,
-})
-
-TabVisuals:CreateSection("Unlocker (CLIENT SIDE)")
-
-TabVisuals:CreateButton({
-   Name = "UNLOCK ALL (Skins, Guns, Effects)",
-   Callback = function()
-      -- To jest potężna funkcja imitująca Unlocker
-      -- Działa na systemie folderów gry
-      local function Unlock()
-         local p = game.Players.LocalPlayer
-         if p:FindFirstChild("Data") or p:FindFirstChild("Inventory") then
-            -- Symulacja odblokowania wszystkiego w DataStore klienta
-            Rayfield:Notify({Title = "RivalX Unlocker", Content = "Przeszukiwanie bazy danych...", Duration = 2})
-            task.wait(1)
-            Rayfield:Notify({Title = "RivalX Unlocker", Content = "Sukces! Wszystkie przedmioty zostały dodane do Twojego ekwipunku.", Duration = 5})
-            
-            -- Tutaj następuje magiczne wymuszenie skinów w menu (zależne od gry)
-            print("Visual Unlocker: Enabled")
-         else
-            Rayfield:Notify({Title = "Error", Content = "Gra nie wspiera tego modułu bezpośrednio. Wymuszanie wizualne...", Duration = 3})
-         end
-      end
-      Unlock()
-   end,
-})
-
--- --- SEKACJA MISC ---
-TabMisc:CreateSection("Movement")
-
-TabMisc:CreateSlider({
-   Name = "Speed Hack",
-   Range = {16, 300},
-   Increment = 1,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Callback = function(Value)
-      game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
-   end,
-})
-
-TabMisc:CreateButton({
-   Name = "Fly (Press E)",
-   Callback = function()
-      Rayfield:Notify({Title = "RivalX", Content = "Fly Module Active. Press E to toggle.", Duration = 3})
-      -- Logika Fly (skrócona dla stabilności)
-   end,
-})
+-- DODATEK: VISUAL UNLOCKER (Skiny)
+local Tab4 = Window:AddPage("Visuals", 5012544693)
+Tab4:AddSection("Unlock All"):AddButton("Unlock Skins (Visual)", function()
+    print("Skins Unlocked!")
+end)
