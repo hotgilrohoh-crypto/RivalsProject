@@ -1,83 +1,46 @@
--- [[ KICIA HOOK V4 REPLICA | NO KEY VERSION ]]
--- [[ AUTHOR: hotgilrohoh-crypto | FOR RIVALX PROJECT ]]
+-- [[ KICIA HOOK V4 | XENO STABLE VERSION ]]
+-- No External Libs = No Crashes
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/kavo"))()
-local Window = Library.AssetLibrary("Kicia Hook | No Key", 1) -- Dokładnie ten sam styl GUI
-
--- USTAWIENIA GŁÓWNE
-getgenv().SilentAim = false
-getgenv().FOV = 150
-getgenv().ShowFOV = true
-getgenv().WallCheck = false
-
--- ZAKŁADKI (IDentyczne jak w oryginale)
-local Tab1 = Window:AddPage("Combat", 5012544693)
-local Tab2 = Window:AddPage("Visuals", 5012544693)
-local Tab3 = Window:AddPage("Skins", 5012544693)
-local Tab4 = Window:AddPage("Misc", 5012544693)
-
--- --- SEKCJA COMBAT ---
-local MainCombat = Tab1:AddSection("Main Combat")
-MainCombat:AddToggle("Silent Aim", false, function(state)
-    getgenv().SilentAim = state
-end)
-
-MainCombat:AddSlider("FOV Radius", 150, 0, 800, function(value)
-    getgenv().FOV = value
-end)
-
-MainCombat:AddToggle("Show FOV Circle", true, function(state)
-    getgenv().ShowFOV = state
-end)
-
-MainCombat:AddDropdown("Target Part", {"Head", "HumanoidRootPart"}, function(part)
-    getgenv().TargetPart = part
-end)
-
--- --- SEKCJA VISUALS (ESP) ---
-local ESPSection = Tab2:AddSection("ESP Settings")
-ESPSection:AddToggle("Box ESP", false, function(v) _G.Box = v end)
-ESPSection:AddToggle("Tracers", false, function(v) _G.Tracers = v end)
-
--- --- SEKCJA SKINS (UNLOCK ALL) ---
-local SkinSection = Tab3:AddSection("Visual Unlocker")
-SkinSection:AddButton("Unlock All Skins/Melee", function()
-    -- Emulacja Kicia Unlocker
-    print("Kicia Hook: Unlocking all visual assets...")
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Kicia Hook",
-        Text = "All skins unlocked (Visual Only)",
-        Duration = 5
-    })
-end)
-
--- --- LOGIKA SILENT AIM (1:1 KICIA) ---
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2
-FOVCircle.Color = Color3.fromRGB(255, 0, 150)
-FOVCircle.Filled = false
-
+local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+-- USTAWIANIA DOKŁADNIE JAK W KICI
+getgenv().SilentAim = false
+getgenv().FOV = 150
+getgenv().ShowFOV = true
+getgenv().TargetPart = "Head"
+
+-- 1. STWORZENIE KOŁA FOV (Drawing API - Xeno to wspiera)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.Color = Color3.fromRGB(255, 0, 150) -- Kicia Pink
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- 2. FUNKCJA CELOWANIA (Magia 1:1)
 local function GetClosestTarget()
     local target = nil
     local dist = getgenv().FOV
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Head") then
-            local pos, vis = game.Workspace.CurrentCamera:WorldToScreenPoint(v.Character.Head.Position)
-            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-            if magnitude < dist and vis then
-                target = v
-                dist = magnitude
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild(getgenv().TargetPart) then
+            local pos, vis = game.Workspace.CurrentCamera:WorldToScreenPoint(v.Character[getgenv().TargetPart].Position)
+            if vis then
+                local magnitude = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                if magnitude < dist then
+                    target = v
+                    dist = magnitude
+                end
             end
         end
     end
     return target
 end
 
--- HOOKOWANIE MYSZKI (To sprawia że trafiasz w głowę wewnątrz koła)
+-- 3. HOOKOWANIE MYSZKI (To sprawia, że trafiasz poza celownikiem)
 local mt = getrawmetatable(game)
 local oldIndex = mt.__index
 setreadonly(mt, false)
@@ -87,7 +50,8 @@ mt.__index = newcclosure(function(self, index)
         if getgenv().SilentAim then
             local target = GetClosestTarget()
             if target and target.Character then
-                return (index == "Hit" and target.Character.Head.CFrame or target.Character.Head)
+                local part = target.Character[getgenv().TargetPart]
+                return (index == "Hit" and part.CFrame or part)
             end
         end
     end
@@ -95,9 +59,42 @@ mt.__index = newcclosure(function(self, index)
 end)
 setreadonly(mt, true)
 
--- PĘTLA ODŚWIEŻANIA
-game:GetService("RunService").RenderStepped:Connect(function()
-    FOVCircle.Radius = getgenv().FOV
-    FOVCircle.Visible = getgenv().ShowFOV
-    FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+-- 4. PROSTE MENU (Zamiast zepsutych bibliotek)
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 250)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Color3.fromRGB(255, 0, 150)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "KICIA HOOK | RIVALX"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.TextColor3 = Color3.fromRGB(255, 0, 150)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+-- Przycisk Silent Aim
+local SAimBtn = Instance.new("TextButton", MainFrame)
+SAimBtn.Text = "Silent Aim: OFF"
+SAimBtn.Position = UDim2.new(0, 10, 0, 50)
+SAimBtn.Size = UDim2.new(0, 180, 0, 40)
+SAimBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SAimBtn.TextColor3 = Color3.new(1, 1, 1)
+
+SAimBtn.MouseButton1Click:Connect(function()
+    getgenv().SilentAim = not getgenv().SilentAim
+    SAimBtn.Text = "Silent Aim: " .. (getgenv().SilentAim and "ON" or "OFF")
+    SAimBtn.TextColor3 = getgenv().SilentAim and Color3.fromRGB(255, 0, 150) or Color3.new(1, 1, 1)
 end)
+
+-- Pętla odświeżania koła
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Visible = getgenv().ShowFOV
+    FOVCircle.Radius = getgenv().FOV
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+end)
+
+print("RivalX Project: Kicia Edition Loaded!")
